@@ -1,0 +1,33 @@
+# Core
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+pydantic>=2.9.0
+pydantic-settings>=2.6.0
+
+# Database
+sqlalchemy>=2.0.36
+
+# Auth
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+bcrypt>=4.0.0
+
+# ML/Data (tensorflow + scikit-learn only needed once a model is trained)
+numpy>=1.26.0
+pandas>=2.2.0
+yfinance>=0.2.48
+tensorflow>=2.16.0
+scikit-learn>=1.5.0
+joblib>=1.4.0
+
+# NLP/Sentiment
+vaderSentiment>=3.3.2
+requests>=2.32.0
+beautifulsoup4>=4.12.0
+
+# Validation
+email-validator>=2.2.0
+
+# Utilities
+python-dotenv>=1.0.0
+python-multipart>=0.0.12
