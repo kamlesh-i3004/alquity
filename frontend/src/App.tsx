@@ -35,13 +35,27 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   // Track whether a sidebar menu is open on mobile
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [autoRefresh] = useState(true);
+  const AUTO_REFRESH_INTERVAL = 30000; // 30 seconds
 
   // Restore session token on mount (user object comes from login flow)
   useEffect(() => {
-    // If a token exists but user is null, clear the stale token
     const token = getToken();
-    if (!token) {
-      // nothing to restore
+    if (token) {
+      // Restore user from token if it exists
+      const storedUser = localStorage.getItem('aiquity_user');
+      if (storedUser) {
+        try {
+          const user = JSON.parse(storedUser);
+          setUser(user);
+          console.log('[App] Restored user session from localStorage');
+        } catch (e) {
+          console.error('[App] Failed to parse stored user:', e);
+          clearToken();
+          localStorage.removeItem('aiquity_user');
+        }
+      }
     }
   }, []);
 
@@ -51,34 +65,75 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  // Auto-refresh data every 30 seconds when user is logged in
+  useEffect(() => {
+    if (!user || !autoRefresh) return;
+
+    const interval = setInterval(() => {
+      refreshData();
+    }, AUTO_REFRESH_INTERVAL);
+
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, autoRefresh, selectedStock, timeframe]);
+
+  const refreshData = async () => {
+    try {
+      const [stock, prediction, sentiment] = await Promise.all([
+        fetchStockData(selectedStock, timeframe),
+        fetchPrediction(selectedStock),
+        fetchSentiment(selectedStock),
+      ]);
+      setStockData(stock);
+      setPredictionData(prediction);
+      setSentimentData(sentiment);
+      setLastUpdated(new Date());
+      console.log('[App] Auto-refreshed data for', selectedStock);
+    } catch (err) {
+      console.error('[App] Failed to auto-refresh data:', err);
+    }
+  };
+
   const loadAllData = async () => {
     setIsLoading(true);
-    const [stock, prediction, sentiment, port] = await Promise.all([
-      fetchStockData(selectedStock, timeframe),
-      fetchPrediction(selectedStock),
-      fetchSentiment(selectedStock),
-      fetchPortfolio(),
-    ]);
-    setStockData(stock);
-    setPredictionData(prediction);
-    setSentimentData(sentiment);
-    setPortfolio(port);
-    setIsLoading(false);
+    try {
+      const [stock, prediction, sentiment, port] = await Promise.all([
+        fetchStockData(selectedStock, timeframe),
+        fetchPrediction(selectedStock),
+        fetchSentiment(selectedStock),
+        fetchPortfolio(),
+      ]);
+      setStockData(stock);
+      setPredictionData(prediction);
+      setSentimentData(sentiment);
+      setPortfolio(port);
+    } catch (err) {
+      // Log and allow UI to recover instead of freezing the loading state forever
+      console.error('[App] Failed to load initial data:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleStockSearch = async (ticker: string, tf: TimeFrame) => {
     setSelectedStock(ticker);
     setTimeframe(tf);
     setIsLoading(true);
-    const [stock, prediction, sentiment] = await Promise.all([
-      fetchStockData(ticker, tf),
-      fetchPrediction(ticker),
-      fetchSentiment(ticker),
-    ]);
-    setStockData(stock);
-    setPredictionData(prediction);
-    setSentimentData(sentiment);
-    setIsLoading(false);
+    try {
+      const [stock, prediction, sentiment] = await Promise.all([
+        fetchStockData(ticker, tf),
+        fetchPrediction(ticker),
+        fetchSentiment(ticker),
+      ]);
+      setStockData(stock);
+      setPredictionData(prediction);
+      setSentimentData(sentiment);
+      setLastUpdated(new Date());
+    } catch (err) {
+      console.error('[App] Failed to load data for search:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleAddToPortfolio = (ticker: string, shares: number, price: number) => {
@@ -107,13 +162,18 @@ function App() {
 
   const handleLogin = (userData: User) => {
     setUser(userData);
+    // Persist user to localStorage for session restoration
+    localStorage.setItem('aiquity_user', JSON.stringify(userData));
     setActiveTab('dashboard');
+    console.log('[App] User logged in and session saved');
   };
 
   const handleLogout = () => {
     clearToken();
+    localStorage.removeItem('aiquity_user');
     setUser(null);
     setActiveTab('dashboard');
+    console.log('[App] User logged out and session cleared');
   };
 
   // Show login if not authenticated
@@ -143,7 +203,12 @@ function App() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <CandlestickChart data={stockData} selectedStock={selectedStock} />
+            <CandlestickChart
+              data={stockData}
+              selectedStock={selectedStock}
+              onRefresh={refreshData}
+              lastUpdated={lastUpdated || undefined}
+            />
           </motion.div>
         );
       case 'predictions':
@@ -272,7 +337,7 @@ function App() {
         </div>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto w-full">
+        <main className="flex-1 overflow-y-auto w-full relative" style={{ zIndex: 1 }}>
           <div className="p-4 sm:p-6 lg:p-8">
             {/* Header */}
             <header className="mb-6 sm:mb-8">

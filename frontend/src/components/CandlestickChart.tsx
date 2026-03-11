@@ -2,16 +2,16 @@ import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import Plot from 'react-plotly.js';
 import type { StockData, ChartType } from '../types';
-import { 
-  TrendingUp, 
-  Activity, 
-  Target, 
+import {
+  TrendingUp,
+  Activity,
+  Target,
   BarChart3,
   Layers,
-  Info,
   CandlestickChart as CandleIcon,
   LineChart as LineIcon,
-  BarChart as BarIcon
+  BarChart as BarIcon,
+  RefreshCw
 } from 'lucide-react';
 import {
   Tooltip,
@@ -19,15 +19,18 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
 
 interface CandlestickChartProps {
   data: StockData | null;
   selectedStock: string;
+  onRefresh?: () => void;
+  lastUpdated?: Date;
 }
 
 type Indicator = 'volume' | 'rsi' | 'macd' | 'bollinger' | 'ma';
 
-export default function CandlestickChart({ data, selectedStock }: CandlestickChartProps) {
+export default function CandlestickChart({ data, selectedStock, lastUpdated, onRefresh }: CandlestickChartProps) {
   const [chartType, setChartType] = useState<ChartType>('candlestick');
   const [activeIndicators, setActiveIndicators] = useState<Indicator[]>([
     'volume', 'ma'
@@ -433,9 +436,21 @@ export default function CandlestickChart({ data, selectedStock }: CandlestickCha
                 {chartType.charAt(0).toUpperCase() + chartType.slice(1)} chart with technical analysis
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <Info className="w-4 h-4 text-white/40" />
-              <span className="text-xs text-white/40">Scroll to zoom, drag to pan</span>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-xs text-white/40">Last updated</p>
+                <p className="text-xs text-white/60">
+                  {lastUpdated ? lastUpdated.toLocaleTimeString() : 'N/A'}
+                </p>
+              </div>
+              <Button
+                onClick={onRefresh}
+                variant="outline"
+                size="sm"
+                className="border-white/10 text-white hover:bg-white/10"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </Button>
             </div>
           </div>
           

@@ -1,4 +1,5 @@
 import type { StockData, PredictionData, SentimentData, Portfolio, TimeFrame, CandleData, NewsArticle } from '../types';
+import { formatMarketCap } from './currency';
 
 const stockNames: Record<string, string> = {
   'AAPL': 'Apple Inc.',
@@ -165,7 +166,10 @@ export const generateMockStockData = (ticker: string, timeframe: TimeFrame): Sto
   const movingAverage = calculateSMA(prices);
   
   const trend = changePercent > 1 ? 'bullish' : changePercent < -1 ? 'bearish' : 'neutral';
-  
+
+  // Calculate market cap value (in numeric form for formatting)
+  const marketCapValue = currentPrice * candleData[candleData.length - 1].volume * 1000;
+
   return {
     ticker,
     name: stockNames[ticker] || `${ticker} Corp`,
@@ -173,7 +177,7 @@ export const generateMockStockData = (ticker: string, timeframe: TimeFrame): Sto
     change,
     changePercent,
     volume: candleData[candleData.length - 1].volume,
-    marketCap: `$${(Math.random() * 2 + 0.5).toFixed(2)}T`,
+    marketCap: formatMarketCap(marketCapValue, ticker),
     peRatio: parseFloat((Math.random() * 30 + 10).toFixed(2)),
     high52w: Math.max(...prices) * 1.2,
     low52w: Math.min(...prices) * 0.8,
@@ -228,13 +232,35 @@ export const generateMockPrediction = (ticker: string): PredictionData => {
       stable: parseFloat(stableProb.toFixed(3))
     },
     mlPrediction: predictedPrice * (1 + (Math.random() - 0.5) * 0.01),
+    mlConfidence: Math.random() * 0.2 + 0.7,
+    mlMetrics: {
+      r2: Math.random() * 0.15 + 0.8,
+      rmse: parseFloat((Math.random() * 3 + 1).toFixed(2)),
+      mae: parseFloat((Math.random() * 2 + 0.5).toFixed(2)),
+      directionAccuracy: Math.random() * 0.15 + 0.8
+    },
     dlPrediction: predictedPrice * (1 + (Math.random() - 0.5) * 0.015),
+    dlConfidence: Math.random() * 0.2 + 0.72,
+    trendPrediction: predictedPrice * (1 + (Math.random() - 0.5) * 0.02),
+    trendChange: predictedPrice * (1 + (Math.random() - 0.5) * 0.02) - basePrice,
+    trendChangePercent: ((predictedPrice * (1 + (Math.random() - 0.5) * 0.02) - basePrice) / basePrice) * 100,
     historicalPredictions: { dates, actual, predicted },
     modelMetrics: {
       mlAccuracy: parseFloat((Math.random() * 0.15 + 0.75).toFixed(3)),
       dlAccuracy: parseFloat((Math.random() * 0.15 + 0.78).toFixed(3)),
-      rmse: parseFloat((Math.random() * 5 + 2).toFixed(2)),
-      mae: parseFloat((Math.random() * 4 + 1).toFixed(2))
+      lstmLoss: {
+        epochs: [1, 2, 3, 4, 5],
+        trainLoss: [0.5, 0.3, 0.2, 0.15, 0.1],
+        valLoss: [0.6, 0.35, 0.25, 0.18, 0.12]
+      },
+      confusionMatrix: [[45, 5], [8, 42]],
+      featureImportance: [
+        { feature: 'RSI', importance: 0.25 },
+        { feature: 'MACD', importance: 0.20 },
+        { feature: 'Volume', importance: 0.18 },
+        { feature: 'Moving Avg', importance: 0.15 },
+        { feature: 'Bollinger Bands', importance: 0.12 }
+      ]
     }
   };
 };

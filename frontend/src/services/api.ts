@@ -7,19 +7,13 @@
  * development when the backend is offline.
  */
 
-import type { StockData, PredictionData, SentimentData, Portfolio, TimeFrame, User } from '../types';
-import {
-  generateMockStockData,
-  generateMockPrediction,
-  generateMockSentiment,
-  generateMockPortfolio,
-} from '../utils/mockData';
+import type { StockData, PredictionData, SentimentData, Portfolio, PortfolioHolding, TimeFrame, User } from '../types';
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1';
+const BASE_URL = import.meta.env.DEV ? '' : 'http://localhost:8000';
 const TIMEOUT_MS = 8000;
 
 // Map frontend display timeframes to backend yfinance period strings
@@ -61,7 +55,8 @@ async function apiFetch<T>(
 ): Promise<T> {
   const { params, ...init } = options;
 
-  const url = new URL(path, BASE_URL);
+  // Construct URL - use relative path in dev (via Vite proxy), absolute in production
+  const url = BASE_URL ? new URL(path, BASE_URL) : new URL(path, window.location.origin);
   if (params) {
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
@@ -79,6 +74,7 @@ async function apiFetch<T>(
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
+    console.log(`[API] Fetching: ${url.toString()}`);
     const res = await fetch(url.toString(), {
       ...init,
       headers,
@@ -87,10 +83,20 @@ async function apiFetch<T>(
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      throw new Error(body?.detail ?? `HTTP ${res.status}`);
+      const error = new Error(body?.detail ?? `HTTP ${res.status}`);
+      console.error(`[API] Error from ${url.toString()}:`, error);
+      throw error;
     }
 
-    return res.json() as Promise<T>;
+    const data = await res.json();
+    console.log(`[API] Success: ${url.toString()}`, data);
+    return data as T;
+  } catch (err) {
+    console.error(`[API] Fetch failed for ${url.toString()}:`, err);
+    if (err instanceof TypeError && err.message === 'Failed to fetch') {
+      throw new Error(`Failed to connect to backend at ${BASE_URL || window.location.origin}. Make sure the server is running.`);
+    }
+    throw err;
   } finally {
     clearTimeout(timer);
   }
@@ -120,18 +126,18 @@ function mapBackendUser(
 }
 
 export async function loginUser(payload: LoginPayload): Promise<User> {
-  const tokenRes = await apiFetch<TokenResponse>('/auth/login', {
+  const tokenRes = await apiFetch<TokenResponse>('/api/v1/auth/login', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
   setToken(tokenRes.access_token);
-  const userRes = await apiFetch<BackendUser>('/auth/me');
+  const userRes = await apiFetch<BackendUser>('/api/v1/auth/me');
   return mapBackendUser(userRes, 'email');
 }
 
 export async function registerUser(payload: RegisterPayload): Promise<User> {
   // Backend expects full_name instead of name
-  await apiFetch('/auth/register', {
+  await apiFetch('/api/v1/auth/register', {
     method: 'POST',
     body: JSON.stringify({ email: payload.email, full_name: payload.name, password: payload.password }),
   });
@@ -141,11 +147,11 @@ export async function registerUser(payload: RegisterPayload): Promise<User> {
 
 export async function oauthLogin(provider: string, name: string, email: string): Promise<User> {
   const tokenRes = await apiFetch<TokenResponse>(
-    `/auth/oauth?provider=${encodeURIComponent(provider)}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`,
+    `/api/v1/auth/oauth?provider=${encodeURIComponent(provider)}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`,
     { method: 'POST' },
   );
   setToken(tokenRes.access_token);
-  const userRes = await apiFetch<BackendUser>('/auth/me');
+  const userRes = await apiFetch<BackendUser>('/api/v1/auth/me');
   return mapBackendUser(userRes, provider as 'google' | 'github' | 'email');
 }
 
@@ -157,7 +163,7 @@ export async function fetchStockData(
   symbol: string,
   timeframe: TimeFrame = '1M',
 ): Promise<StockData> {
-  return await apiFetch<StockData>(`/stocks/${encodeURIComponent(symbol)}`, {
+  return await apiFetch<StockData>(`/api/v1/stocks/${encodeURIComponent(symbol)}`, {
     params: { period: TF_TO_PERIOD[timeframe] ?? '1mo' },
   });
 }
@@ -167,7 +173,7 @@ export async function fetchStockData(
 // ---------------------------------------------------------------------------
 
 export async function fetchPrediction(symbol: string): Promise<PredictionData> {
-  return await apiFetch<PredictionData>(`/predictions/${encodeURIComponent(symbol)}`);
+  return await apiFetch<PredictionData>(`/api/v1/predictions/${encodeURIComponent(symbol)}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +181,25 @@ export async function fetchPrediction(symbol: string): Promise<PredictionData> {
 // ---------------------------------------------------------------------------
 
 export async function fetchSentiment(symbol: string): Promise<SentimentData> {
-  return await apiFetch<SentimentData>(`/sentiment/${encodeURIComponent(symbol)}`);
+  return await apiFetch<SentimentData>(`/api/v1/sentiment/${encodeURIComponent(symbol)}`);
+}
+
+// ---------------------------------------------------------------------------
+// Model Performance
+// ---------------------------------------------------------------------------
+
+export interface ModelPerformanceData {
+  ml_metrics: { accuracy: number; precision: number; recall: number; f1_score: number };
+  dl_metrics: { accuracy: number; precision: number; recall: number; f1_score: number };
+  feature_importance: { feature: string; importance: number }[];
+  training_history: { epoch: number; accuracy: number; val_accuracy: number }[];
+  loss_history: { epochs: number[]; train_loss: number[]; val_loss: number[] };
+  confusion_matrix: number[][];
+  last_updated: string;
+}
+
+export async function fetchModelPerformance(): Promise<ModelPerformanceData> {
+  return await apiFetch<ModelPerformanceData>('/api/v1/models/performance');
 }
 
 // Portfolio Types (matching backend)
@@ -249,15 +273,15 @@ function mapBackendPortfolio(backend: BackendPortfolio): Portfolio {
 
 export async function fetchPortfolio(): Promise<Portfolio> {
   // Get user's portfolios
-  const portfolios = await apiFetch<BackendPortfolio[]>('/portfolio');
+  const portfolios = await apiFetch<BackendPortfolio[]>('/api/v1/portfolio');
 
   if (portfolios.length === 0) {
     // Create a default portfolio if none exists
-    await apiFetch('/portfolio', {
+    await apiFetch('/api/v1/portfolio', {
       method: 'POST',
       body: JSON.stringify({ name: 'My Portfolio' }),
     });
-    const newPortfolios = await apiFetch<BackendPortfolio[]>('/portfolio');
+    const newPortfolios = await apiFetch<BackendPortfolio[]>('/api/v1/portfolio');
     return mapBackendPortfolio(newPortfolios[0]);
   }
 
@@ -265,7 +289,7 @@ export async function fetchPortfolio(): Promise<Portfolio> {
 }
 
 export async function createPortfolio(name: string): Promise<Portfolio> {
-  const portfolio = await apiFetch<BackendPortfolio>('/portfolio', {
+  const portfolio = await apiFetch<BackendPortfolio>('/api/v1/portfolio', {
     method: 'POST',
     body: JSON.stringify({ name }),
   });
@@ -273,22 +297,22 @@ export async function createPortfolio(name: string): Promise<Portfolio> {
 }
 
 export async function addHoldingToPortfolio(
-  portfolioId: string, 
-  ticker: string, 
-  shares: number, 
+  portfolioId: string,
+  ticker: string,
+  shares: number,
   avgCost: number
 ): Promise<BackendHolding> {
-  return await apiFetch<BackendHolding>(`/portfolio/${portfolioId}/holdings`, {
+  return await apiFetch<BackendHolding>(`/api/v1/portfolio/${portfolioId}/holdings`, {
     method: 'POST',
     body: JSON.stringify({ ticker, shares, avg_cost: avgCost }),
   });
 }
 
 export async function removeHoldingFromPortfolio(
-  portfolioId: string, 
+  portfolioId: string,
   holdingId: string
 ): Promise<void> {
-  await apiFetch(`/portfolio/${portfolioId}/holdings/${holdingId}`, {
+  await apiFetch(`/api/v1/portfolio/${portfolioId}/holdings/${holdingId}`, {
     method: 'DELETE',
   });
 }
@@ -298,7 +322,7 @@ export async function removeHoldingFromPortfolio(
 // ---------------------------------------------------------------------------
 
 export async function updateProfile(name: string): Promise<User> {
-  const res = await apiFetch<BackendUser>('/auth/me', {
+  const res = await apiFetch<BackendUser>('/api/v1/auth/me', {
     method: 'PATCH',
     body: JSON.stringify({ full_name: name }),
   });
@@ -306,13 +330,13 @@ export async function updateProfile(name: string): Promise<User> {
 }
 
 export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
-  await apiFetch('/auth/password', {
+  await apiFetch('/api/v1/auth/password', {
     method: 'PUT',
     body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
   });
 }
 
 export async function deleteAccount(): Promise<void> {
-  await apiFetch('/auth/me', { method: 'DELETE' });
+  await apiFetch('/api/v1/auth/me', { method: 'DELETE' });
   clearToken();
 }

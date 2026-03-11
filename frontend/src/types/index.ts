@@ -49,18 +49,44 @@ export interface PredictionData {
     down: number;
     stable: number;
   };
+  // ML Model (Random Forest)
   mlPrediction: number;
+  mlConfidence: number;
+  mlMetrics: {
+    r2: number;
+    rmse: number;
+    mae: number;
+    directionAccuracy: number;
+  };
+  // DL Model (Deep Learning)
   dlPrediction: number;
+  dlConfidence: number;
+  // Trend Model (Linear Regression)
+  trendPrediction: number;
+  trendChange: number;
+  trendChangePercent: number;
+  // Feature importance from ML model
+  featureImportance?: Record<string, number>;
+  // Historical data
   historicalPredictions: {
     dates: string[];
     actual: number[];
     predicted: number[];
   };
-  modelMetrics: {
+  // Model metrics (may not be available for international stocks)
+  modelMetrics?: {
     mlAccuracy: number;
     dlAccuracy: number;
-    rmse: number;
-    mae: number;
+    lstmLoss: {
+      epochs: number[];
+      trainLoss: number[];
+      valLoss: number[];
+    };
+    confusionMatrix: number[][];
+    featureImportance: {
+      feature: string;
+      importance: number;
+    }[];
   };
 }
 
