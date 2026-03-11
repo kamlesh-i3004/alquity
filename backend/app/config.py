@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     # Security / JWT
     SECRET_KEY: str = "change_me_to_a_long_random_secret_key"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days = 10080 minutes
 
     # Database
     DATABASE_URL: str = "sqlite:///./aiquity.db"

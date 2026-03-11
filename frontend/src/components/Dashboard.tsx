@@ -1,9 +1,9 @@
 import { motion } from 'framer-motion';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  DollarSign, 
-  BarChart3, 
+import {
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  BarChart3,
   Activity,
   Brain,
   MessageSquare,
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { StockData, PredictionData, SentimentData } from '../types';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
+import { formatPrice, formatMarketCap } from '../utils/currency';
 
 interface DashboardProps {
   stockData: StockData | null;
@@ -41,10 +42,44 @@ const itemVariants = {
 };
 
 export default function Dashboard({ stockData, predictionData, sentimentData }: DashboardProps) {
+  // Loading state - show skeleton while data is being fetched
   if (!stockData || !predictionData || !sentimentData) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-white/50">Loading dashboard data...</p>
+      <div className="space-y-6">
+        {/* Skeleton Loader */}
+        <div className="glass-card p-6 animate-pulse">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-white/10" />
+              <div className="space-y-2">
+                <div className="h-6 w-24 bg-white/10 rounded" />
+                <div className="h-4 w-32 bg-white/10 rounded" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="h-4 w-20 bg-white/10 rounded" />
+              <div className="h-10 w-32 bg-white/10 rounded" />
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="glass-card p-6 animate-pulse">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-white/10" />
+                <div className="space-y-2">
+                  <div className="h-4 w-24 bg-white/10 rounded" />
+                  <div className="h-3 w-32 bg-white/10 rounded" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="h-4 w-full bg-white/10 rounded" />
+                <div className="h-4 w-full bg-white/10 rounded" />
+                <div className="h-2 w-full bg-white/10 rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -93,7 +128,7 @@ export default function Dashboard({ stockData, predictionData, sentimentData }: 
           <div className="flex items-center gap-8">
             <div>
               <p className="text-sm text-white/50 mb-1">Current Price</p>
-              <p className="text-4xl font-bold text-white">${stockData.price.toFixed(2)}</p>
+              <p className="text-4xl font-bold text-white">{formatPrice(stockData.price, stockData.ticker)}</p>
             </div>
             <div>
               <p className="text-sm text-white/50 mb-1">Daily Change</p>
@@ -134,10 +169,10 @@ export default function Dashboard({ stockData, predictionData, sentimentData }: 
         <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 mt-6 pt-6 border-t border-white/10">
           {[
             { label: 'Volume', value: stockData.volume.toLocaleString(), icon: BarChart3 },
-            { label: 'Market Cap', value: stockData.marketCap, icon: DollarSign },
+            { label: 'Market Cap', value: formatMarketCap(stockData.price * stockData.volume, stockData.ticker), icon: DollarSign },
             { label: 'P/E Ratio', value: stockData.peRatio.toFixed(2), icon: Activity },
-            { label: '52W High', value: `$${stockData.high52w.toFixed(2)}`, icon: TrendingUp },
-            { label: '52W Low', value: `$${stockData.low52w.toFixed(2)}`, icon: TrendingDown },
+            { label: '52W High', value: formatPrice(stockData.high52w, stockData.ticker), icon: TrendingUp },
+            { label: '52W Low', value: formatPrice(stockData.low52w, stockData.ticker), icon: TrendingDown },
             { label: 'Avg Volume', value: stockData.avgVolume, icon: BarChart3 },
           ].map((metric, idx) => (
             <motion.div
@@ -183,7 +218,7 @@ export default function Dashboard({ stockData, predictionData, sentimentData }: 
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-sm text-white/60">Predicted Price</span>
-              <span className="font-bold text-white">${predictionData.mlPrediction.toFixed(2)}</span>
+              <span className="font-bold text-white">{formatPrice(predictionData.mlPrediction, predictionData.ticker)}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-white/60">Confidence</span>
@@ -224,16 +259,16 @@ export default function Dashboard({ stockData, predictionData, sentimentData }: 
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-sm text-white/60">Predicted Price</span>
-              <span className="font-bold text-white">${predictionData.dlPrediction.toFixed(2)}</span>
+              <span className="font-bold text-white">{formatPrice(predictionData.dlPrediction, predictionData.ticker)}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-white/60">Model Accuracy</span>
-              <span className="font-bold text-[#C084FC]">{(predictionData.modelMetrics.dlAccuracy * 100).toFixed(1)}%</span>
+              <span className="font-bold text-[#C084FC]">{((predictionData.modelMetrics?.dlAccuracy ?? 0) * 100).toFixed(1)}%</span>
             </div>
             <div className="w-full bg-white/10 rounded-full h-2 mt-2">
               <motion.div
                 initial={{ width: 0 }}
-                animate={{ width: `${predictionData.modelMetrics.dlAccuracy * 100}%` }}
+                animate={{ width: `${(predictionData.modelMetrics?.dlAccuracy ?? 0) * 100}%` }}
                 transition={{ duration: 1, delay: 0.6 }}
                 className="h-2 rounded-full"
                 style={{ background: 'linear-gradient(90deg, #C084FC, #6E56F8)' }}
@@ -283,29 +318,29 @@ export default function Dashboard({ stockData, predictionData, sentimentData }: 
             <div className="flex justify-between items-center">
               <span className="text-sm text-white/60">Sentiment Score</span>
               <span className={`font-bold ${
-                sentimentData.sentimentScore > 0 ? 'text-green-400' :
-                sentimentData.sentimentScore < 0 ? 'text-red-400' :
+                (sentimentData.sentimentScore ?? 0) > 0 ? 'text-green-400' :
+                (sentimentData.sentimentScore ?? 0) < 0 ? 'text-red-400' :
                 'text-yellow-400'
               }`}>
-                {sentimentData.sentimentScore > 0 ? '+' : ''}{sentimentData.sentimentScore.toFixed(1)}
+                {(sentimentData.sentimentScore ?? 0) > 0 ? '+' : ''}{(sentimentData.sentimentScore ?? 0).toFixed(1)}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-white/60">News Articles</span>
-              <span className="font-bold text-white">{sentimentData.newsArticles.length}</span>
+              <span className="font-bold text-white">{sentimentData.newsArticles?.length ?? 0}</span>
             </div>
             <div className="flex gap-1 mt-2">
-              <div 
+              <div
                 className="h-2 bg-green-500 rounded-l-full"
-                style={{ width: `${sentimentData.sentimentDistribution.positive * 100}%` }}
+                style={{ width: `${(sentimentData.sentimentDistribution?.positive ?? 0) * 100}%` }}
               />
-              <div 
+              <div
                 className="h-2 bg-yellow-500"
-                style={{ width: `${sentimentData.sentimentDistribution.neutral * 100}%` }}
+                style={{ width: `${(sentimentData.sentimentDistribution?.neutral ?? 0) * 100}%` }}
               />
-              <div 
+              <div
                 className="h-2 bg-red-500 rounded-r-full"
-                style={{ width: `${sentimentData.sentimentDistribution.negative * 100}%` }}
+                style={{ width: `${(sentimentData.sentimentDistribution?.negative ?? 0) * 100}%` }}
               />
             </div>
           </div>
@@ -320,9 +355,9 @@ export default function Dashboard({ stockData, predictionData, sentimentData }: 
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
-            { label: 'Price Up', probability: predictionData.probabilities.up, color: 'green', icon: TrendingUp },
-            { label: 'Price Down', probability: predictionData.probabilities.down, color: 'red', icon: TrendingDown },
-            { label: 'Stable', probability: predictionData.probabilities.stable, color: 'yellow', icon: Activity },
+            { label: 'Price Up', probability: predictionData.probabilities?.up ?? 0, color: 'green', icon: TrendingUp },
+            { label: 'Price Down', probability: predictionData.probabilities?.down ?? 0, color: 'red', icon: TrendingDown },
+            { label: 'Stable', probability: predictionData.probabilities?.stable ?? 0, color: 'yellow', icon: Activity },
           ].map((item, idx) => (
             <div key={item.label} className="relative">
               <div className="flex items-center justify-between mb-2">

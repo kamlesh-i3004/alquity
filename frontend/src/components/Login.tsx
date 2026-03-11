@@ -34,6 +34,14 @@ export default function Login({ onLogin }: LoginProps) {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+
+    // Validate password length (bcrypt has 72-byte limit)
+    if (password.length > 72) {
+      setError('Password must be 72 characters or less.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       let user: User;
       if (activeTab === 'signup') {
@@ -42,16 +50,12 @@ export default function Login({ onLogin }: LoginProps) {
         user = await loginUser({ email, password });
       }
       onLogin(user);
-    } catch (err) {
-      // Fallback: allow login with mock user so UI stays usable without backend
-      console.warn('[Login] API unavailable, using mock user:', err);
-      onLogin({
-        id: '1',
-        name: name || email.split('@')[0],
-        email,
-        plan: 'Pro',
-        provider: 'email',
-      });
+    } catch (err: any) {
+      console.error('[Login] Failed to authenticate with backend:', err);
+      setError(
+        err?.message ??
+          'Unable to sign in. Please check your email and password and make sure the backend is running.',
+      );
     } finally {
       setIsLoading(false);
     }
@@ -65,15 +69,9 @@ export default function Login({ onLogin }: LoginProps) {
     try {
       const user = await oauthLogin(provider, mockName, mockEmail);
       onLogin(user);
-    } catch {
-      // Fallback
-      onLogin({
-        id: provider === 'google' ? '2' : '3',
-        name: mockName,
-        email: mockEmail,
-        plan: provider === 'google' ? 'Pro' : 'Enterprise',
-        provider,
-      });
+    } catch (err: any) {
+      console.error('[Login] OAuth login failed:', err);
+      setError('OAuth login failed. Please try again or use email/password.');
     } finally {
       setIsLoading(false);
     }
@@ -263,6 +261,7 @@ export default function Login({ onLogin }: LoginProps) {
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter your password"
                       className="pl-12 pr-12 py-3 bg-white/5 border-white/10 text-white placeholder:text-white/30 rounded-xl"
+                      maxLength={72}
                       required
                     />
                     <button

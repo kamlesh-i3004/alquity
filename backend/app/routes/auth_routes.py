@@ -122,10 +122,11 @@ def oauth_login(
     """
     user = db.query(User).filter(User.email == email).first()
     if not user:
+        # Generate a short random password for OAuth users (bcrypt has 72-byte limit)
         user = User(
             email=email,
             full_name=name,
-            hashed_password=get_password_hash(secrets.token_hex(32)),
+            hashed_password=get_password_hash(secrets.token_hex(16)),  # 32 chars, well under limit
         )
         db.add(user)
         db.commit()

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Wallet, 
-  TrendingUp, 
-  TrendingDown, 
+import {
+  Wallet,
+  TrendingUp,
+  TrendingDown,
   Plus,
   PieChart,
   DollarSign,
@@ -29,6 +29,7 @@ import {
   YAxis,
   CartesianGrid
 } from 'recharts';
+import { formatPrice } from '../utils/currency';
 
 interface PortfolioTrackerProps {
   portfolio: Portfolio | null;
@@ -303,13 +304,13 @@ export default function PortfolioTracker({ portfolio, onAddStock }: PortfolioTra
                       </div>
                     </td>
                     <td className="p-3 text-right text-white">{holding.shares}</td>
-                    <td className="p-3 text-right text-white/60">${holding.avgPrice.toFixed(2)}</td>
-                    <td className="p-3 text-right text-white">${holding.currentPrice.toFixed(2)}</td>
-                    <td className="p-3 text-right text-white font-medium">${holding.value.toLocaleString()}</td>
+                    <td className="p-3 text-right text-white/60">{formatPrice(holding.avgPrice, holding.ticker)}</td>
+                    <td className="p-3 text-right text-white">{formatPrice(holding.currentPrice, holding.ticker)}</td>
+                    <td className="p-3 text-right text-white font-medium">{formatPrice(holding.value, holding.ticker, 0)}</td>
                     <td className="p-3 text-right">
                       <div className={`flex items-center justify-end gap-1 ${holding.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                         {holding.pnl >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                        <span className="font-medium">{holding.pnl >= 0 ? '+' : ''}${holding.pnl.toLocaleString()}</span>
+                        <span className="font-medium">{holding.pnl >= 0 ? '+' : ''}{formatPrice(holding.pnl, holding.ticker, 0)}</span>
                         <span className="text-xs">({holding.pnl >= 0 ? '+' : ''}{holding.pnlPercent.toFixed(2)}%)</span>
                       </div>
                     </td>

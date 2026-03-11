@@ -9,10 +9,10 @@ interface NodeProps {
 
 function Node({ position, color }: NodeProps) {
   const meshRef = useRef<THREE.Mesh>(null);
-  
-  useFrame((state) => {
+
+  useFrame(({ clock }) => {
     if (meshRef.current) {
-      meshRef.current.position.y = position[1] + Math.sin(state.clock.elapsedTime + position[0]) * 0.1;
+      meshRef.current.position.y = position[1] + Math.sin(clock.elapsedTime + position[0]) * 0.1;
     }
   });
 
@@ -69,10 +69,10 @@ function NeuralNetwork() {
     return connArray;
   }, [nodes]);
 
-  useFrame((state) => {
+  useFrame(({ clock }) => {
     if (groupRef.current) {
-      groupRef.current.rotation.y = state.clock.elapsedTime * 0.02;
-      groupRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.1) * 0.05;
+      groupRef.current.rotation.y = clock.elapsedTime * 0.02;
+      groupRef.current.rotation.x = Math.sin(clock.elapsedTime * 0.1) * 0.05;
     }
   });
 
@@ -103,9 +103,9 @@ function ParticleField() {
     return geo;
   }, []);
 
-  useFrame((state) => {
+  useFrame(({ clock }) => {
     if (pointsRef.current) {
-      pointsRef.current.rotation.y = state.clock.elapsedTime * 0.01;
+      pointsRef.current.rotation.y = clock.elapsedTime * 0.01;
     }
   });
 

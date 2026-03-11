@@ -1,9 +1,9 @@
 import { motion } from 'framer-motion';
-import { 
-  BarChart3, 
-  Brain, 
-  Cpu, 
-  TrendingUp, 
+import {
+  BarChart3,
+  Brain,
+  Cpu,
+  TrendingUp,
   Target,
   Zap,
   Activity,
@@ -22,58 +22,62 @@ import {
   Bar,
   Cell
 } from 'recharts';
-import { useState } from 'react';
-
-// Mock model metrics data
-const generateModelMetrics = () => ({
-  mlAccuracy: 0.847,
-  dlAccuracy: 0.892,
-  lstmLoss: {
-    epochs: Array.from({ length: 50 }, (_, i) => i + 1),
-    trainLoss: Array.from({ length: 50 }, (_, i) => 0.5 * Math.exp(-i / 15) + 0.05 + Math.random() * 0.02),
-    valLoss: Array.from({ length: 50 }, (_, i) => 0.6 * Math.exp(-i / 15) + 0.08 + Math.random() * 0.03),
-  },
-  confusionMatrix: [
-    [142, 18, 12],
-    [22, 128, 15],
-    [8, 12, 95]
-  ],
-  featureImportance: [
-    { feature: 'Price Momentum', importance: 0.245 },
-    { feature: 'Volume', importance: 0.189 },
-    { feature: 'RSI', importance: 0.156 },
-    { feature: 'MACD', importance: 0.134 },
-    { feature: 'Bollinger Bands', importance: 0.112 },
-    { feature: 'Moving Average', importance: 0.089 },
-    { feature: 'Sentiment', importance: 0.075 },
-  ],
-  modelComparison: [
-    { metric: 'Accuracy', ml: 84.7, dl: 89.2, lstm: 91.5 },
-    { metric: 'Precision', ml: 82.3, dl: 87.8, lstm: 90.1 },
-    { metric: 'Recall', ml: 81.5, dl: 86.4, lstm: 89.3 },
-    { metric: 'F1 Score', ml: 81.9, dl: 87.1, lstm: 89.7 },
-  ],
-  trainingHistory: Array.from({ length: 30 }, (_, i) => ({
-    epoch: i + 1,
-    accuracy: 0.5 + 0.4 * (1 - Math.exp(-i / 8)) + Math.random() * 0.02,
-    valAccuracy: 0.5 + 0.38 * (1 - Math.exp(-i / 8)) + Math.random() * 0.025,
-  })),
-});
+import { useState, useEffect } from 'react';
+import { fetchModelPerformance, type ModelPerformanceData } from '../services/api';
+import { Loader2 } from 'lucide-react';
 
 export default function ModelPerformance() {
-  const [metrics] = useState(generateModelMetrics());
-  const [selectedModel, setSelectedModel] = useState<'ml' | 'dl' | 'lstm'>('lstm');
+  const [metrics, setMetrics] = useState<ModelPerformanceData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedModel, setSelectedModel] = useState<'ml' | 'dl'>('dl');
+
+  useEffect(() => {
+    loadModelPerformance();
+  }, []);
+
+  const loadModelPerformance = async () => {
+    try {
+      const data = await fetchModelPerformance();
+      setMetrics(data);
+    } catch (error) {
+      console.error('Failed to load model performance:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="glass-card p-8 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 text-[#6E56F8] animate-spin" />
+          <p className="text-white/50">Loading model performance...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!metrics) {
+    return (
+      <div className="glass-card p-8 flex items-center justify-center">
+        <p className="text-white/50">Failed to load model performance data.</p>
+      </div>
+    );
+  }
 
   // Prepare loss data
-  const lossData = metrics.lstmLoss.epochs.map((epoch, i) => ({
+  const lossData = metrics.loss_history.epochs.map((epoch, i) => ({
     epoch,
-    trainLoss: metrics.lstmLoss.trainLoss[i],
-    valLoss: metrics.lstmLoss.valLoss[i],
+    trainLoss: metrics.loss_history.train_loss[i],
+    valLoss: metrics.loss_history.val_loss[i],
   }));
 
   // Prepare confusion matrix visualization
   const confusionLabels = ['Up', 'Down', 'Stable'];
   const confusionColors = ['#22C55E', '#EF4444', '#EAB308'];
+
+  const mlMetrics = metrics.ml_metrics;
+  const dlMetrics = metrics.dl_metrics;
 
   return (
     <div className="space-y-6">
@@ -99,9 +103,8 @@ export default function ModelPerformance() {
         className="flex gap-2"
       >
         {[
-          { id: 'ml', label: 'Machine Learning', icon: Brain, accuracy: metrics.mlAccuracy },
-          { id: 'dl', label: 'Deep Learning', icon: Cpu, accuracy: metrics.dlAccuracy },
-          { id: 'lstm', label: 'LSTM Network', icon: Layers, accuracy: 0.915 },
+          { id: 'ml', label: 'Machine Learning', icon: Brain, accuracy: mlMetrics.accuracy },
+          { id: 'dl', label: 'Deep Learning', icon: Cpu, accuracy: dlMetrics.accuracy },
         ].map((model) => (
           <motion.button
             key={model.id}
@@ -126,27 +129,27 @@ export default function ModelPerformance() {
       {/* Key Metrics Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { 
-            label: 'Accuracy', 
-            value: selectedModel === 'ml' ? '84.7%' : selectedModel === 'dl' ? '89.2%' : '91.5%',
+          {
+            label: 'Accuracy',
+            value: selectedModel === 'ml' ? mlMetrics.accuracy : dlMetrics.accuracy,
             icon: Target,
             color: '#6E56F8'
           },
-          { 
-            label: 'Precision', 
-            value: selectedModel === 'ml' ? '82.3%' : selectedModel === 'dl' ? '87.8%' : '90.1%',
+          {
+            label: 'Precision',
+            value: selectedModel === 'ml' ? mlMetrics.precision : dlMetrics.precision,
             icon: CheckCircle,
             color: '#22C55E'
           },
-          { 
-            label: 'Recall', 
-            value: selectedModel === 'ml' ? '81.5%' : selectedModel === 'dl' ? '86.4%' : '89.3%',
+          {
+            label: 'Recall',
+            value: selectedModel === 'ml' ? mlMetrics.recall : dlMetrics.recall,
             icon: Activity,
             color: '#C084FC'
           },
-          { 
-            label: 'F1 Score', 
-            value: selectedModel === 'ml' ? '81.9%' : selectedModel === 'dl' ? '87.1%' : '89.7%',
+          {
+            label: 'F1 Score',
+            value: selectedModel === 'ml' ? mlMetrics.f1_score : dlMetrics.f1_score,
             icon: Zap,
             color: '#F59E0B'
           },
@@ -159,7 +162,7 @@ export default function ModelPerformance() {
             className="glass-card p-4"
           >
             <div className="flex items-center gap-3 mb-2">
-              <div 
+              <div
                 className="w-8 h-8 rounded-lg flex items-center justify-center"
                 style={{ backgroundColor: `${metric.color}20` }}
               >
@@ -167,7 +170,7 @@ export default function ModelPerformance() {
               </div>
               <span className="text-xs text-white/50">{metric.label}</span>
             </div>
-            <p className="text-2xl font-bold text-white">{metric.value}</p>
+            <p className="text-2xl font-bold text-white">{(metric.value * 100).toFixed(1)}%</p>
           </motion.div>
         ))}
       </div>
@@ -190,8 +193,8 @@ export default function ModelPerformance() {
               <XAxis dataKey="epoch" stroke="#71717a" />
               <YAxis stroke="#71717a" domain={[0, 'auto']} />
               <Tooltip
-                contentStyle={{ 
-                  backgroundColor: '#141416', 
+                contentStyle={{
+                  backgroundColor: '#141416',
                   border: '1px solid rgba(255,255,255,0.1)',
                   borderRadius: '8px'
                 }}
@@ -255,7 +258,7 @@ export default function ModelPerformance() {
                 </tr>
               </thead>
               <tbody>
-                {metrics.confusionMatrix.map((row, i) => (
+                {metrics.confusion_matrix.map((row, i) => (
                   <tr key={i}>
                     <td className="p-2 text-sm text-white/60 font-medium">
                       Actual {confusionLabels[i]}
@@ -267,7 +270,7 @@ export default function ModelPerformance() {
                           animate={{ scale: 1 }}
                           transition={{ delay: 0.5 + (i * 3 + j) * 0.1 }}
                           className="w-16 h-16 rounded-lg flex items-center justify-center font-bold text-white"
-                          style={{ 
+                          style={{
                             backgroundColor: `${confusionColors[i]}${Math.floor((value / 150) * 40 + 20).toString(16).padStart(2, '0')}`,
                             color: confusionColors[i]
                           }}
@@ -305,7 +308,7 @@ export default function ModelPerformance() {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={metrics.featureImportance}
+                data={metrics.feature_importance}
                 layout="vertical"
                 margin={{ left: 100 }}
               >
@@ -313,18 +316,18 @@ export default function ModelPerformance() {
                 <XAxis type="number" domain={[0, 0.3]} stroke="#71717a" tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} />
                 <YAxis dataKey="feature" type="category" stroke="#71717a" width={100} tick={{ fontSize: 12 }} />
                 <Tooltip
-                  contentStyle={{ 
-                    backgroundColor: '#141416', 
+                  contentStyle={{
+                    backgroundColor: '#141416',
                     border: '1px solid rgba(255,255,255,0.1)',
                     borderRadius: '8px'
                   }}
                   formatter={(value: number) => [`${(value * 100).toFixed(1)}%`, 'Importance']}
                 />
                 <Bar dataKey="importance" radius={[0, 4, 4, 0]}>
-                  {metrics.featureImportance.map((_entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={index < 3 ? '#6E56F8' : '#C084FC'} 
+                  {metrics.feature_importance.map((_entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={index < 3 ? '#6E56F8' : '#C084FC'}
                     />
                   ))}
                 </Bar>
@@ -352,26 +355,25 @@ export default function ModelPerformance() {
                 <th className="p-3 text-left text-sm text-white/60 font-medium">Metric</th>
                 <th className="p-3 text-center text-sm text-white/60 font-medium">Machine Learning</th>
                 <th className="p-3 text-center text-sm text-white/60 font-medium">Deep Learning</th>
-                <th className="p-3 text-center text-sm text-white/60 font-medium">LSTM</th>
               </tr>
             </thead>
             <tbody>
-              {metrics.modelComparison.map((row) => (
+              {[
+                { metric: 'Accuracy', ml: mlMetrics.accuracy, dl: dlMetrics.accuracy },
+                { metric: 'Precision', ml: mlMetrics.precision, dl: dlMetrics.precision },
+                { metric: 'Recall', ml: mlMetrics.recall, dl: dlMetrics.recall },
+                { metric: 'F1 Score', ml: mlMetrics.f1_score, dl: dlMetrics.f1_score },
+              ].map((row) => (
                 <tr key={row.metric} className="border-b border-white/5">
                   <td className="p-3 text-sm text-white font-medium">{row.metric}</td>
                   <td className="p-3 text-center">
-                    <span className={`text-sm font-bold ${row.ml >= 85 ? 'text-green-400' : 'text-white'}`}>
-                      {row.ml.toFixed(1)}%
+                    <span className={`text-sm font-bold ${row.ml >= 0.85 ? 'text-green-400' : 'text-white'}`}>
+                      {(row.ml * 100).toFixed(1)}%
                     </span>
                   </td>
                   <td className="p-3 text-center">
-                    <span className={`text-sm font-bold ${row.dl >= 85 ? 'text-green-400' : 'text-white'}`}>
-                      {row.dl.toFixed(1)}%
-                    </span>
-                  </td>
-                  <td className="p-3 text-center">
-                    <span className={`text-sm font-bold ${row.lstm >= 85 ? 'text-green-400' : 'text-white'}`}>
-                      {row.lstm.toFixed(1)}%
+                    <span className={`text-sm font-bold ${row.dl >= 0.85 ? 'text-green-400' : 'text-white'}`}>
+                      {(row.dl * 100).toFixed(1)}%
                     </span>
                   </td>
                 </tr>
@@ -394,13 +396,13 @@ export default function ModelPerformance() {
         </h3>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={metrics.trainingHistory}>
+            <LineChart data={metrics.training_history}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
               <XAxis dataKey="epoch" stroke="#71717a" />
               <YAxis stroke="#71717a" domain={[0.4, 1]} tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} />
               <Tooltip
-                contentStyle={{ 
-                  backgroundColor: '#141416', 
+                contentStyle={{
+                  backgroundColor: '#141416',
                   border: '1px solid rgba(255,255,255,0.1)',
                   borderRadius: '8px'
                 }}
@@ -416,7 +418,7 @@ export default function ModelPerformance() {
               />
               <Line
                 type="monotone"
-                dataKey="valAccuracy"
+                dataKey="val_accuracy"
                 stroke="#6E56F8"
                 strokeWidth={2}
                 strokeDasharray="5 5"

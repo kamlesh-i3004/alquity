@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, field_validator, Field
 
 
@@ -26,3 +26,38 @@ class PredictionResponse(BaseModel):
     predictions: list[PredictionDataPoint]
     generated_at: datetime
     model_accuracy: Optional[float] = None
+
+
+# Model Performance Schemas
+class ModelMetrics(BaseModel):
+    accuracy: float
+    precision: float
+    recall: float
+    f1_score: float
+
+
+class FeatureImportance(BaseModel):
+    feature: str
+    importance: float
+
+
+class TrainingHistory(BaseModel):
+    epoch: int
+    accuracy: float
+    val_accuracy: float
+
+
+class LossHistory(BaseModel):
+    epochs: List[int]
+    train_loss: List[float]
+    val_loss: List[float]
+
+
+class ModelPerformanceResponse(BaseModel):
+    ml_metrics: ModelMetrics
+    dl_metrics: ModelMetrics
+    feature_importance: List[FeatureImportance]
+    training_history: List[TrainingHistory]
+    loss_history: LossHistory
+    confusion_matrix: List[List[int]]
+    last_updated: str
